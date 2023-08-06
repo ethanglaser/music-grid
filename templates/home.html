@@ -15,14 +15,26 @@
       gap: 10px;
     }
     .grid-item {
-      width: 100%; /* Ensures square buttons */
-      aspect-ratio: 1 / 1; /* Ensures square buttons */
+      width: 30vw; /* Adjust the width to fit the screen perfectly */
+      height: 30vh; /* Adjust the height to fit the screen perfectly */
+      background-size: cover; /* Adjust the image size to cover the button */
+      background-repeat: no-repeat; /* Prevent repeating the image if it's smaller than the button */
       display: flex;
       align-items: center;
       justify-content: center;
-      background-color: lightblue;
+      background-color: gray;
       border: 1px solid black;
       cursor: pointer;
+      background-repeat: no-repeat; /* Prevent repeating the image if it's smaller than the button */
+      background-position: center top; /* Center the background image both horizontally and vertically */
+      background-size: 40% auto; /* Adjust the width of the background image */    display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        /* New styles for positioning the text at the center bottom */
+        text-align: center;
+        padding-bottom: 10px; /* Add some space at the bottom to separate the text from the image */
+        color: white; /* Set the text color to white */
     }
     .header-label {
       text-align: center;
@@ -46,9 +58,39 @@
       border-radius: 5px;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
     }
+    /* Additional styles for the suggestion dropdown */
+  .suggestions-container {
+    position: absolute;
+    width: 100%;
+    max-height: 150px;
+    overflow-y: auto;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 999;
+    display: none;
+  }
+
+  .suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+
+    .suggestion-item img {
+    width: 50px; /* Adjust the width to make the images smaller */
+    height: 50px; /* Adjust the height to make the images smaller */
+    margin-right: 10px; /* Add some space between the image and the text */
+    }
+
+  .suggestion-item:hover {
+    background-color: #f2f2f2;
+  }
   </style>
 </head>
 <body>
+    <div id="count-display">Guesses remaining: 9/9</div>
+      <div class="grid-container">
+          <!-- ... -->
+    </div>
   <div class="grid-container">
     <div class="header-label"></div>
     <div class="header-label">{{col1_label}}</div>
@@ -71,8 +113,9 @@
   <div class="popup-container" id="popupContainer" style="display: none;">
     <div class="popup-box">
       <label for="textInput">Enter Text:</label>
-      <input type="text" id="textInput">
-      <button onclick="hidePopup()">Submit</button>
+      <input type="text" id="textInput" autocomplete="off">
+      <div id="suggestionsContainer" class="suggestions-container"></div>
+      <!-- <button onclick="submitData()">Submit</button> -->
     </div>
   </div>
 
@@ -82,12 +125,158 @@
       const inputField = document.getElementById('textInput');
       popupContainer.style.display = 'flex';
       inputField.value = ''; // Clear the input field on each click
+      inputField.dataset.position = position; // Store the position data in a custom attribute
     }
-
+  
     function hidePopup() {
       const popupContainer = document.getElementById('popupContainer');
       popupContainer.style.display = 'none';
     }
+  
+    function submitData() {
+      const inputField = document.getElementById('textInput');
+      const position = inputField.dataset.position;
+      const inputValue = inputField.value;
+      hidePopup(); // Hide the pop-up after clicking submit
+  
+      // Send the data to the server using fetch API (AJAX)
+      fetch('/process_input', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ position, textInput: inputValue }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          console.log(data); // Optional: log the server's response
+          // Handle any response data if needed
+        // Update the button color based on the response
+            const gridItem = document.querySelector(`[onclick="showPopup('${position}')"]`);
+            if (data.correct.length > 0) {
+                gridItem.style.backgroundColor = 'green'; // Set the color for a correct answer
+                gridItem.style.backgroundImage = `url(${JSON.stringify(data.url)})`; // Set the URL of the image
+                gridItem.textContent = data.correct;
+            } 
+            // else {
+            //     gridItem.style.backgroundColor = 'red'; // Set the color for an incorrect answer
+            // }
+            // Update the count displayed above the grid
+            const countDisplay = document.getElementById('count-display');
+            countDisplay.textContent = 'Guesses remaining: ' + data.count + "/9";
+            // Check if the count reached 0
+            if (data.count === 0) {
+            // Show a pop-up with a grid of green and black emojis representing the correct and incorrect boxes
+                showResultPopUp();
+            }
+        })
+        .catch((error) => {
+          console.error('Error:', error);
+          // Handle any error that occurs during the fetch
+        });
+    }
+
+    // Function to get options based on the current input
+  function getOptions() {
+    const inputField = document.getElementById('textInput');
+    const currentInput = inputField.value;
+
+    // Send the current input to the server to get the options
+    fetch('/get_options', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ current_input: currentInput }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        console.log('getOptions() function called');
+        const optionsList = data.options;
+
+        // Display the options to the user (you can implement this based on your UI requirements)
+        displayOptions(optionsList);
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+        // Handle any error that occurs during the fetch
+      });
+  }
+  function displayOptions(optionsList) {
+    // Implement the logic to display options to the user
+    // For example, display them as clickable items in a suggestion dropdown
+    const suggestionsContainer = document.getElementById('suggestionsContainer');
+    if (!suggestionsContainer) {
+      console.error('Suggestions container element not found.');
+      return;
+    }
+
+    // Clear previous suggestions
+    suggestionsContainer.innerHTML = '';
+
+    optionsList.forEach((option) => {
+        // Create a suggestion item (li) for each option
+        const suggestionItem = document.createElement('div');
+        suggestionItem.classList.add('suggestion-item');
+
+        // Create an image element for the suggestion
+        const imgElement = document.createElement('img');
+        imgElement.src = option.imageUrl; // Replace "imageUrl" with the actual key in your data containing the URL
+        imgElement.alt = option.text; // Replace "text" with the actual key in your data containing the text
+
+        // Create a text element for the suggestion
+        const textElement = document.createElement('span');
+        textElement.textContent = option.text; // Replace "text" with the actual key in your data containing the text
+
+        // Add the image and text elements to the suggestion item
+        suggestionItem.appendChild(imgElement);
+        suggestionItem.appendChild(textElement);
+
+        // Add an event listener to handle option selection
+        suggestionItem.addEventListener('click', () => {
+            selectOption(option);
+        });
+
+        // Add the suggestion item to the container
+        suggestionsContainer.appendChild(suggestionItem);
+    });
+
+    // Show the suggestion dropdown
+    suggestionsContainer.style.display = 'block';
+  }
+  function selectOption(option) {
+    const inputField = document.getElementById('textInput');
+    inputField.value = option.text;
+    // // Optionally, you can call the getOptions() function again to refresh the suggestions after the user selects an option.
+    // // This way, the user can continue typing or choose a different option.
+    // getOptions();
+    submitData(); // Trigger the submitData function with the selected option
+
+    // // Hide the suggestion dropdown after the user selects an option
+    // const suggestionsContainer = document.getElementById('suggestionsContainer');
+    // suggestionsContainer.style.display = 'none';
+  }
+
+    function showResultPopUp() {
+    let emojisGrid = '';
+    const gridItems = document.querySelectorAll('.grid-item');
+    const gridWidth = 3; // Assuming a 3x3 grid
+    const emojiGreen = '🟢';
+    const emojiBlack = '⚫';
+
+    gridItems.forEach((gridItem, index) => {
+        if (index > 0 && index % gridWidth === 0) {
+        emojisGrid += '\n'; // Add a new line after each row
+        }
+        emojisGrid += gridItem.style.backgroundColor === 'green' ? emojiGreen : emojiBlack;
+    });
+
+    window.alert('Game Over!\n' + emojisGrid);
+
+    }
+  
+    // Event listener to detect changes in the input text box
+    document.getElementById('textInput').addEventListener('input', getOptions);
   </script>
 </body>
 </html>
